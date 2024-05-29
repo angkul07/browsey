@@ -1,0 +1,1 @@
+can't parse the https schemes. code: url_parser, class: URL, method: init, requests, https://browser.engineering/http.html
