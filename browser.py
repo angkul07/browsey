@@ -2,7 +2,6 @@ import socket
 import ssl
 import tkinter
 
-WIDTH, HEIGHT = 800, 600   #globally defining width and height for gui
 
 class URL:
     def __init__(self, url):
@@ -68,6 +67,22 @@ def lex(body):
             text += c
     return text
 
+WIDTH, HEIGHT = 960, 720
+HSTEP, VSTEP = 13, 18 
+SCROLL_STEP = 100
+
+
+def layout(text):
+    display_list = []
+    cursor_x, cursor_y = HSTEP, VSTEP
+    for c in text:
+        display_list.append((cursor_x, cursor_y, c))
+        cursor_x += HSTEP
+        if cursor_x >= WIDTH - HSTEP:
+            cursor_y += VSTEP
+            cursor_x = HSTEP
+    return display_list
+
 
 class Browser:
     def __init__(self):
@@ -81,14 +96,14 @@ class Browser:
         self.scroll = 0
         self.window.bind("<Down>", self.scrolldown)
         self.window.bind("<Up>", self.scrollup)
-        self.SCROLL_STEP = 100
+        
 
     def scrolldown(self, e):
-        self.scroll += self.SCROLL_STEP
+        self.scroll += SCROLL_STEP
         self.draw()
 
     def scrollup(self, e):
-        self.scroll -= self.SCROLL_STEP
+        self.scroll -= SCROLL_STEP
         if self.scroll < 0:
             self.scroll=0
         self.draw()
@@ -96,6 +111,8 @@ class Browser:
     def draw(self):
         self.canvas.delete("all")
         for x, y, c in self.display_list:
+            if y > self.scroll + HEIGHT: continue
+            if y + VSTEP < self.scroll: continue
             self.canvas.create_text(x, y - self.scroll, text=c)
 
     def load(self, url):
@@ -103,20 +120,6 @@ class Browser:
         text = lex(body)
         self.display_list = layout(text)
         self.draw()
-
-
-def layout(text):
-    HSTEP, VSTEP = 13, 18
-    display_list = []
-    cursor_x, cursor_y = HSTEP, VSTEP
-    for c in text:
-        display_list.append((cursor_x, cursor_y, c))
-        cursor_x += HSTEP
-        if cursor_x >= WIDTH - HSTEP:
-            cursor_y += VSTEP
-            cursor_x = HSTEP
-    return display_list
-
 
 
 if __name__ == "__main__":
