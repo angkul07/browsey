@@ -2,6 +2,8 @@ import socket
 import ssl
 import tkinter
 
+WIDTH, HEIGHT = 800, 600   #globally defining width and height for gui
+
 class URL:
     def __init__(self, url):
         self.scheme, url = url.split("://", 1)
@@ -69,7 +71,6 @@ def lex(body):
 
 class Browser:
     def __init__(self):
-        WIDTH, HEIGHT = 800, 600
         self.window = tkinter.Tk()
         self.canvas = tkinter.Canvas(
             self.window,
@@ -77,13 +78,45 @@ class Browser:
             height=HEIGHT
         )
         self.canvas.pack()
+        self.scroll = 0
+        self.window.bind("<Down>", self.scrolldown)
+        self.window.bind("<Up>", self.scrollup)
+        self.SCROLL_STEP = 100
+
+    def scrolldown(self, e):
+        self.scroll += self.SCROLL_STEP
+        self.draw()
+
+    def scrollup(self, e):
+        self.scroll -= self.SCROLL_STEP
+        if self.scroll < 0:
+            self.scroll=0
+        self.draw()
+
+    def draw(self):
+        self.canvas.delete("all")
+        for x, y, c in self.display_list:
+            self.canvas.create_text(x, y - self.scroll, text=c)
 
     def load(self, url):
         body = url.request()
-        self.canvas.create_rectangle(10, 20, 400, 300)
-        self.canvas.create_oval(100, 100, 150, 150)
-        self.canvas.create_text(200, 150, text="Hi!")
-        show(body)
+        text = lex(body)
+        self.display_list = layout(text)
+        self.draw()
+
+
+def layout(text):
+    HSTEP, VSTEP = 13, 18
+    display_list = []
+    cursor_x, cursor_y = HSTEP, VSTEP
+    for c in text:
+        display_list.append((cursor_x, cursor_y, c))
+        cursor_x += HSTEP
+        if cursor_x >= WIDTH - HSTEP:
+            cursor_y += VSTEP
+            cursor_x = HSTEP
+    return display_list
+
 
 
 if __name__ == "__main__":
