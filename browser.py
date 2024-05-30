@@ -54,7 +54,8 @@ class URL:
         s.close()
         return content
     
-def show(body):
+def lex(body):
+    text = ""
     in_tag = False
     for c in body:
         if c == "<":
@@ -62,7 +63,8 @@ def show(body):
         elif c == ">":
             in_tag = False
         elif not in_tag:
-            print(c, end="")
+            text += c
+    return text
 
 
 class Browser:
