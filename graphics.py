@@ -1,8 +1,8 @@
 import socket
 import ssl
 import tkinter
+import tkinter.font
 
-WIDTH, HEIGHT = 800, 600
 
 class URL:
     def __init__(self, url):
@@ -27,10 +27,11 @@ class URL:
             type=socket.SOCK_STREAM,
             proto=socket.IPPROTO_TCP,
         )
-        s.connect((self.host, self.port))
+        s.connect((self.host, self.port))   #tells the socket to connect to other computer
         if self.scheme == "https":
             ctx = ssl.create_default_context()
             s = ctx.wrap_socket(s, server_hostname=self.host)
+        # Request and response 
         request = "GET {} HTTP/1.0\r\n".format(self.path)
         request += "Host: {}\r\n".format(self.host)
         request += "\r\n"
@@ -38,7 +39,8 @@ class URL:
         response = s.makefile("r", encoding="utf8", newline="\r\n")
         statusline = response.readline()
         version, status, explanation = statusline.split(" ", 2)
-
+        
+        
         response_headers = {}
         while True:
             line = response.readline()
@@ -49,10 +51,11 @@ class URL:
         assert "transfer-encoding" not in response_headers
         assert "content-encoding" not in response_headers
 
+        # read data
         content = response.read()
         s.close()
         return content
-
+    
 def lex(body):
     text = ""
     in_tag = False
@@ -64,6 +67,29 @@ def lex(body):
         elif not in_tag:
             text += c
     return text
+
+WIDTH, HEIGHT = 960, 720
+HSTEP, VSTEP = 13, 18 
+SCROLL_STEP = 100
+
+# looped over the text character-by-character and moved to the next line whenever we ran out of space.# 
+def layout(text):
+    font = tkinter.font.Font()
+    display_list = []
+    cursor_x, cursor_y = HSTEP, VSTEP
+
+    for word in text.split():
+        w = font.measure(word)
+
+    for c in text:
+        display_list.append((cursor_x, cursor_y, c))
+        cursor_x += HSTEP
+        if cursor_x + w >= WIDTH - HSTEP:
+            cursor_y += font.metrics("linespace") * 1.25
+            cursor_x = HSTEP
+    return display_list
+
+
 
 class Browser:
     def __init__(self):
@@ -77,22 +103,31 @@ class Browser:
         self.scroll = 0
         self.window.bind("<Down>", self.scrolldown)
         self.window.bind("<Up>", self.scrollup)
-        self.SCROLL_STEP = 100
+
+        self.bi_code = tkinter.font.Font(
+            family="Cascadia Code",
+            size=16,
+            weight="bold",
+            slant="italic",
+        )
+        
 
     def scrolldown(self, e):
-        self.scroll += self.SCROLL_STEP
+        self.scroll += SCROLL_STEP
         self.draw()
 
     def scrollup(self, e):
-        self.scroll -= self.SCROLL_STEP
+        self.scroll -= SCROLL_STEP
         if self.scroll < 0:
             self.scroll=0
         self.draw()
 
     def draw(self):
-        self.canvas.delete("all")  # Clear the canvas
+        self.canvas.delete("all")
         for x, y, c in self.display_list:
-            self.canvas.create_text(x, y - self.scroll, text=c)  # Draw the text based on the current scroll position
+            if y > self.scroll + HEIGHT: continue
+            if y + VSTEP < self.scroll: continue
+            self.canvas.create_text(x, y - self.scroll, text=c, font=self.bi_code, anchor="nw")
 
     def load(self, url):
         body = url.request()
@@ -100,22 +135,8 @@ class Browser:
         self.display_list = layout(text)
         self.draw()
 
-def layout(text):
-    HSTEP, VSTEP = 13, 18
-    display_list = []
-    cursor_x, cursor_y = HSTEP, VSTEP
-    for c in text:
-        display_list.append((cursor_x, cursor_y, c))
-        cursor_x += HSTEP
-        if cursor_x >= WIDTH - HSTEP:
-            cursor_y += VSTEP
-            cursor_x = HSTEP
-    return display_list
-
 
 if __name__ == "__main__":
     import sys
-    browser = Browser()
-    browser.load(URL(sys.argv[1]))
-    browser.window.mainloop()
-
+    Browser().load(URL(sys.argv[1]))
+    tkinter.mainloop()

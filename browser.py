@@ -1,6 +1,7 @@
 import socket
 import ssl
 import tkinter
+import tkinter.font
 
 
 class URL:
@@ -71,15 +72,18 @@ WIDTH, HEIGHT = 960, 720
 HSTEP, VSTEP = 13, 18 
 SCROLL_STEP = 100
 
-
+# looped over the text character-by-character and moved to the next line whenever we ran out of space.# 
 def layout(text):
+    font = tkinter.font.Font()
     display_list = []
     cursor_x, cursor_y = HSTEP, VSTEP
-    for c in text:
-        display_list.append((cursor_x, cursor_y, c))
-        cursor_x += HSTEP
-        if cursor_x >= WIDTH - HSTEP:
-            cursor_y += VSTEP
+
+    for word in text:
+        w = font.measure(word)
+        display_list.append((cursor_x, cursor_y, word))
+        cursor_x += w + font.measure(" ") 
+        if cursor_x + w >= WIDTH - HSTEP:
+            cursor_y += font.metrics("linespace")*1.25
             cursor_x = HSTEP
     return display_list
 
@@ -96,6 +100,13 @@ class Browser:
         self.scroll = 0
         self.window.bind("<Down>", self.scrolldown)
         self.window.bind("<Up>", self.scrollup)
+
+        self.bi_code = tkinter.font.Font(
+            family="Cascadia Code",
+            size=16,
+            weight="bold",
+            slant="italic",
+        )
         
 
     def scrolldown(self, e):
@@ -113,7 +124,7 @@ class Browser:
         for x, y, c in self.display_list:
             if y > self.scroll + HEIGHT: continue
             if y + VSTEP < self.scroll: continue
-            self.canvas.create_text(x, y - self.scroll, text=c)
+            self.canvas.create_text(x, y - self.scroll, text=c, font=self.bi_code, anchor="nw")
 
     def load(self, url):
         body = url.request()
