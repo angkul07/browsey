@@ -57,35 +57,75 @@ class URL:
         return content
     
 def lex(body):
-    text = ""
+    out = []
+    buffer = ""
     in_tag = False
     for c in body:
         if c == "<":
             in_tag = True
+            if buffer: out.append(Text(buffer))
+            buffer = ""
         elif c == ">":
             in_tag = False
-        elif not in_tag:
-            text += c
-    return text
+            out.append(Tag(buffer))
+            buffer=""
+        else:
+            buffer += c
+    if not in_tag and buffer:
+        out.append(Text(buffer))
+    return out
 
 WIDTH, HEIGHT = 960, 720
 HSTEP, VSTEP = 13, 18 
 SCROLL_STEP = 100
 
-# looped over the text character-by-character and moved to the next line whenever we ran out of space.# 
-def layout(text):
-    font = tkinter.font.Font()
-    display_list = []
-    cursor_x, cursor_y = HSTEP, VSTEP
 
-    for word in text:
+class Text:
+    def __init__(self, text):
+        self.text = text
+
+class Tag:
+    def __init__(self, tag):
+        self.tag = tag
+
+
+# looped over the text character-by-character and moved to the next line whenever we ran out of space.# 
+class Layout:
+    def __init__(self, tokens):
+        self.display_list = []
+        self.weight = "normal"
+        self.style = "roman"
+        self.cursor_x, self.cursor_y = HSTEP, VSTEP
+        for tok in tokens:
+            self.token(tok)
+
+    def token(self, tok):
+        if isinstance(tok, Text):
+            for word in tok.text:
+                self.word(word)
+        elif tok.tag == "i":
+            self.style = "italic"
+        elif tok.tag == "/i":
+            self.style = "roman"
+        elif tok.tag == "b":
+            self.weight = "bold"
+        elif tok.tag == "/b":
+            self.weight = "normal"
+        return self.display_list
+    
+    def word(self, word):
+        font = tkinter.font.Font(
+            size=16,
+            weight=self.weight,
+            slant=self.style,
+            )
         w = font.measure(word)
-        display_list.append((cursor_x, cursor_y, word))
-        cursor_x += w + font.measure(" ") 
-        if cursor_x + w >= WIDTH - HSTEP:
-            cursor_y += font.metrics("linespace")*1.25
-            cursor_x = HSTEP
-    return display_list
+        self.display_list.append((self.cursor_x, self.cursor_y, word, font))
+        self.cursor_x += w + font.measure(" ") 
+        if self.cursor_x + w >= WIDTH - HSTEP:
+            self.cursor_y += font.metrics("linespace")*1.25
+            self.cursor_x = HSTEP
+
 
 
 class Browser:
@@ -121,16 +161,17 @@ class Browser:
 
     def draw(self):
         self.canvas.delete("all")
-        for x, y, c in self.display_list:
+        for x, y, word, in self.display_list:
             if y > self.scroll + HEIGHT: continue
             if y + VSTEP < self.scroll: continue
-            self.canvas.create_text(x, y - self.scroll, text=c, font=self.bi_code, anchor="nw")
+            self.canvas.create_text(x, y - self.scroll, text=word, font=self.bi_code, anchor="nw")
 
     def load(self, url):
         body = url.request()
-        text = lex(body)
-        self.display_list = layout(text)
+        tokens = lex(body)
+        self.display_list = Layout(tokens).display_list
         self.draw()
+
 
 
 if __name__ == "__main__":
