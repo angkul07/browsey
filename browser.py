@@ -56,42 +56,17 @@ class URL:
         s.close()
         return content
     
-def lex(body):
-    out = []
-    buffer = ""
-    in_tag = False
-    for c in body:
-        if c == "<":
-            in_tag = True
-            if buffer: out.append(Text(buffer))
-            buffer = ""
-        elif c == ">":
-            in_tag = False
-            out.append(Tag(buffer))
-            buffer=""
-        else:
-            buffer += c
-    if not in_tag and buffer:
-        out.append(Text(buffer))
-    return out
 
 WIDTH, HEIGHT = 960, 720
 HSTEP, VSTEP = 13, 18 
 SCROLL_STEP = 100
 
 
-class Text:
-    def __init__(self, text):
-        self.text = text
-
-class Tag:
-    def __init__(self, tag):
-        self.tag = tag
-
 
 class Browser:
     def __init__(self):
         self.window = tkinter.Tk()
+        self.window.title("Browsey")
         self.canvas = tkinter.Canvas(
             self.window,
             width=WIDTH,
@@ -101,7 +76,7 @@ class Browser:
         self.scroll = 0
         self.window.bind("<Down>", self.scrolldown)
         self.window.bind("<Up>", self.scrollup)
-        # self.display_list = []
+        self.display_list = []
         
 
     def scrolldown(self, e):
@@ -126,6 +101,45 @@ class Browser:
         tokens = lex(body)
         self.display_list = Layout(tokens).display_list
         self.draw()
+
+
+def lex(body):
+    out = []
+    buffer = ""
+    in_tag = False
+    for c in body:
+        if c == "<":
+            in_tag = True
+            if buffer: out.append(Text(buffer))
+            buffer = ""
+        elif c == ">":
+            in_tag = False
+            out.append(Tag(buffer))
+            buffer=""
+        else:
+            buffer += c
+    if not in_tag and buffer:
+        out.append(Text(buffer))
+    return out
+
+
+FONTS = {}
+
+def get_font(size, weight, slant):
+    key = (size, weight, slant)
+    if key not in FONTS:
+        font = tkinter.font.Font(size = size, weight = weight, slant = slant)
+        label = tkinter.Label(font = font)
+        FONTS[key] = (font, label)
+    return FONTS[key][0]
+class Text:
+    def __init__(self, text):
+        self.text = text
+
+class Tag:
+    def __init__(self, tag):
+        self.tag = tag
+
 
 # looped over the text character-by-character and moved to the next line whenever we ran out of space.# 
 class Layout:
@@ -170,17 +184,10 @@ class Layout:
             self.cursor_y += VSTEP
     
     def word(self, word):
-        font = tkinter.font.Font(
-            size=self.size,
-            weight=self.weight,
-            slant=self.style,
-            )
+        font = get_font(self.size, self.weight, self.style)
         w = font.measure(word)
-        # self.display_list.append((self.cursor_x, self.cursor_y, word, font))
         if self.cursor_x + w > WIDTH - HSTEP:
             self.flush()
-            # self.cursor_y += font.metrics("linespace")*1.25
-            # self.cursor_x = HSTEP
         self.line.append((self.cursor_x, word, font))
         self.cursor_x += w + font.measure(" ") 
 
