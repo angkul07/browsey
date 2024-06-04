@@ -8,7 +8,6 @@ HSTEP, VSTEP = 13, 18
 SCROLL_STEP = 100
 
 
-
 class Browser:
     def __init__(self):
         self.window = tkinter.Tk()
