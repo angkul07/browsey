@@ -10,6 +10,7 @@ class URL:
             url = url + "/"
         self.host, url = url.split("/", 1)
         self.path = "/" + url
+# When parsing a URL, you often need to determine which port to use for network communication. 
         if self.scheme == "http":
             self.port = 80
         elif self.scheme == "https":
@@ -53,3 +54,5 @@ class URL:
         content = response.read()
         s.close()
         return content
+    
+    
