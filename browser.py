@@ -2,11 +2,9 @@ import url
 import tkinter
 import tkinter.font
     
-
 WIDTH, HEIGHT = 960, 720
 HSTEP, VSTEP = 13, 18 
 SCROLL_STEP = 100
-
 
 class Browser:
     def __init__(self):
@@ -51,6 +49,7 @@ class HTMLParser:
     def __init__(self, body):
         self.body = body
         self.unfinished = []
+
     def parse(self):
         text = ""
         in_tag = False
@@ -69,14 +68,6 @@ class HTMLParser:
             self.add_text(text)
         return self.finish()
     
-    def finish(self):
-        if not self.unfinished:
-            self.implicit_tags(None)
-        while len(self.unfinished) > 1:
-            node = self.unfinished.pop()
-            parent = self.unfinished[-1]
-            parent.children.append(node)
-        return self.unfinished.pop()
     
     # adding nodes to a tree. Text nodes and tag nodes
     def add_text(self, text):
@@ -95,6 +86,7 @@ class HTMLParser:
         tag, attributes = self.get_attributes(tag)
         if tag.startswith("!"): return
         self.implicit_tags(tag)
+
         if tag.startswith("/"):
             if len(self.unfinished) == 1: return
             node = self.unfinished.pop()
@@ -150,6 +142,15 @@ class HTMLParser:
             else:
                 break
 
+    def finish(self):
+        if not self.unfinished:
+            self.implicit_tags(None)
+        while len(self.unfinished) > 1:
+            node = self.unfinished.pop()
+            parent = self.unfinished[-1]
+            parent.children.append(node)
+        return self.unfinished.pop()
+    
 FONTS = {}
 
 def get_font(size, weight, slant):
@@ -182,8 +183,7 @@ class Element:
 
 # looped over the text character-by-character and moved to the next line whenever we ran out of space.# 
 class Layout:
-    def __init__(self, tokens):
-        self.tokens = tokens
+    def __init__(self, tree):
         self.display_list = []
 
         self.weight = "normal"
@@ -192,6 +192,7 @@ class Layout:
         self.cursor_x, self.cursor_y = HSTEP, VSTEP
 
         self.line = []
+        self.recurse(tree)
         self.flush()
 
     def token(self, tok): pass
