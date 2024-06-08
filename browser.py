@@ -40,10 +40,6 @@ class BlockLayout:
         self.height = None
 
         self.display_list = []
-        self.weight = "normal"
-        self.style = "roman"
-        self.size = 12
-        self.cursor_x, self.cursor_y = HSTEP, VSTEP
 
         # self.line = []
 
@@ -74,19 +70,51 @@ class BlockLayout:
             self.recurse(self.node)
             self.flush()
 
+        for child in self.children:
+            child.layout()
+
         if mode == "block":
             self.height = sum([
                 child.height for child in self.children])
         else:
             self.y = self.parent.y
 
-        for child in self.children:
-            child.layout()
-        self.recurse(self.node)
-        self.flush()
+    def layout_mode(self):
+        if isinstance(self.node, Text):
+            return "inline"
+        elif any([isinstance(child, Element) and \
+                  child.tag in BLOCK_ELEMENTS
+                  for child in self.node.children]):
+            return "block"
+        elif self.node.children:
+            return "inline"
+        else:
+            return "block"
+
+    def word(self, word):
+        font = get_font(self.size, self.weight, self.style)
+        w = font.measure(word)
+        if self.cursor_x + w >= self.width:
+            self.flush()
+        self.line.append((self.cursor_x, word, font))
+        self.cursor_x += w + font.measure(" ") 
+
+    def flush(self):
+        if not self.line: return
+        metrics = [font.metrics() for x, word, font in self.line]
+        max_ascent = max([metric["ascent"] for metric in metrics])
+        baseline = self.cursor_y + 1.25*max_ascent
+        for rel_x, word, font in self.line:
+            x = self.x + rel_x
+            y = self.y + baseline - font.metrics("ascent")
+            self.display_list.append((x, y, word, font))
+        self.cursor_x = 0
+        self.line = []
+        max_descent = max([metric["descent"] for metric in metrics])
+        self.cursor_y = baseline + 1.25*max_descent
 
 
-    def token(self, tok): pass
+    # def token(self, tok): pass
 
     def recurse(self, tree):
         if isinstance(tree, Text):
@@ -124,28 +152,6 @@ class BlockLayout:
             self.flush()
             self.cursor_y += VSTEP
     
-    def word(self, word):
-        font = get_font(self.size, self.weight, self.style)
-        w = font.measure(word)
-        if self.cursor_x + w >= self.width:
-            self.flush()
-        self.line.append((self.cursor_x, word, font))
-        self.cursor_x += w + font.measure(" ") 
-
-    def flush(self):
-        if not self.line: return
-        metrics = [font.metrics() for x, word, font in self.line]
-        max_ascent = max([metric["ascent"] for metric in metrics])
-        baseline = self.cursor_y + 1.25*max_ascent
-        for rel_x, word, font in self.line:
-            x = self.x + rel_x
-            y = self.y + baseline - font.metrics("ascent")
-            self.display_list.append((x, y, word, font))
-
-        max_descent = max([metric["descent"] for metric in metrics])
-        self.cursor_y = baseline + 1.25*max_descent
-        self.cursor_x = 0
-        self.line = []
 
     def layout_intermediate(self):
         previous = None
@@ -153,18 +159,6 @@ class BlockLayout:
             next = BlockLayout(child, self, previous)
             self.children.append(next)
             previous = next
-
-    def layout_mode(self):
-        if isinstance(self.node, Text):
-            return "inline"
-        elif any([isinstance(child, Element) and \
-                  child.tag in BLOCK_ELEMENTS
-                  for child in self.node.children]):
-            return "block"
-        elif self.node.children:
-            return "inline"
-        else:
-            return "block"
         
     def paint(self):
         return self.display_list
@@ -232,7 +226,7 @@ class Browser:
     def load(self, url):
         body = url.request()
         self.nodes = HTMLParser(body).parse()
-        self.display_list = BlockLayout(self.nodes).display_list
+        # self.display_list = BlockLayout(self.nodes).display_list
         self.document = BlockLayout(self.nodes)
         self.document.layout()
         self.display_list = []
