@@ -1,7 +1,7 @@
 import url
 import tkinter
 import tkinter.font
-from htmplarser import HTMLParser, Element, Text
+from htmparser import HTMLParser, Element, Text
     
 WIDTH, HEIGHT = 960, 720
 HSTEP, VSTEP = 13, 18
