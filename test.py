@@ -45,7 +45,7 @@ class Browser:
         self.nodes = HTMLParser(body).parse()
         self.display_list = Layout(self.nodes).display_list
         self.document = Layout(self.nodes)
-        self.document.layout()
+        # self.document.layout()
         self.draw()
     
 FONTS = {}

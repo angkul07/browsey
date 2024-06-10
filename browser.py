@@ -18,6 +18,7 @@ def get_font(size, weight, slant):
         FONTS[key] = (font, label)
     return FONTS[key][0]
 
+
 BLOCK_ELEMENTS = [
     "html", "body", "article", "section", "nav", "aside",
     "h1", "h2", "h3", "h4", "h5", "h6", "hgroup", "header",
@@ -38,7 +39,6 @@ class BlockLayout:
         self.y = None
         self.width = None
         self.height = None
-
         self.display_list = []
 
         # self.line = []
@@ -77,7 +77,7 @@ class BlockLayout:
             self.height = sum([
                 child.height for child in self.children])
         else:
-            self.y = self.parent.y
+            self.height = self.cursor_y
 
     def layout_mode(self):
         if isinstance(self.node, Text):
@@ -153,15 +153,25 @@ class BlockLayout:
             self.cursor_y += VSTEP
     
 
-    def layout_intermediate(self):
-        previous = None
-        for child in self.node.children:
-            next = BlockLayout(child, self, previous)
-            self.children.append(next)
-            previous = next
+    # def layout_intermediate(self):
+    #     previous = None
+    #     for child in self.node.children:
+    #         next = BlockLayout(child, self, previous)
+    #         self.children.append(next)
+    #         previous = next
         
     def paint(self):
-        return self.display_list
+        cmds = []
+
+        if isinstance(self.node, Element) and self.node.tag == "pre":
+            x2, y2 = self.x + self.width, self.y + self.height
+            rect = DrawRect(self.x, self.y, x2, y2, "gray")
+            cmds.append(rect)
+
+        if self.layout_mode() == "inline":
+            for x, y, word, font in self.display_list:
+                cmds.append(DrawText(x, y, word, font))
+        return cmds
         
 
 class DocumentLayout:
@@ -184,6 +194,38 @@ class DocumentLayout:
     def paint(self):
         return []
 
+
+class DrawText:
+    def __init__(self, x1, y1, text, font):
+        self.top = y1
+        self.left = x1
+        self.text = text
+        self.font = font
+        self.bottom = y1 + font.metrics("linespace")
+
+    def execute(self, scroll, canvas):
+        canvas.create_text(
+            self.left, self.top - scroll,
+            text = self.text,
+            font = self.font,
+            anchor='nw')
+
+class DrawRect:
+    def __init__(self, x1, y1, x2, y2, color):
+        self.top = y1
+        self.left = x1
+        self.bottom = y2
+        self.right = x2
+        self.color = color 
+
+    def execute(self, scroll, canvas):
+        canvas.create_rectangle(
+            self.left, self.top - scroll,
+            self.right, self.bottom - scroll,
+            width=0,
+            fill=self.color
+        )
+
 def paint_tree(layout_object, display_list):
     display_list.extend(layout_object.paint())
 
@@ -203,31 +245,30 @@ class Browser:
         self.scroll = 0
         self.window.bind("<Down>", self.scrolldown)
         self.window.bind("<Up>", self.scrollup)
-        self.display_list = []
+        # self.display_list = []
         
 
     def scrolldown(self, e):
-        self.scroll += SCROLL_STEP
+        max_y = max(self.document.height + 2*VSTEP - HEIGHT, 0)
+        self.scroll = min(self.scroll + SCROLL_STEP, max_y)
         self.draw()
 
     def scrollup(self, e):
-        self.scroll -= SCROLL_STEP
-        if self.scroll < 0:
-            self.scroll=0
+        self.scroll = max(self.scroll - SCROLL_STEP, 0)
         self.draw()
 
     def draw(self):
         self.canvas.delete("all")
-        for x, y, word, font in self.display_list:
-            if y > self.scroll + HEIGHT: continue
-            if y + VSTEP < self.scroll: continue
-            self.canvas.create_text(x, y - self.scroll, text=word, font=font, anchor="nw")
+        for cmd in self.display_list:
+            if cmd.top > self.scroll + HEIGHT: continue
+            if cmd.bottom < self.scroll: continue
+            cmd.execute(self.scroll, self.canvas)
 
     def load(self, url):
         body = url.request()
         self.nodes = HTMLParser(body).parse()
         # self.display_list = BlockLayout(self.nodes).display_list
-        self.document = BlockLayout(self.nodes)
+        self.document = DocumentLayout(self.nodes)
         self.document.layout()
         self.display_list = []
         paint_tree(self.document, self.display_list)
