@@ -1,4 +1,4 @@
-import url
+from url import URL
 import tkinter
 import tkinter.font
 from htmparser import HTMLParser
@@ -9,6 +9,13 @@ HSTEP, VSTEP = 13, 18
 SCROLL_STEP = 100
 
 # chapter 6 start
+
+INHERITED_PROPERTIES = {
+    "font-size": "16px",
+    "font-style": "normal",
+    "font-weight": "normal",
+    "color": "black",
+}
 
 def tree_to_list(tree, list):
     list.append(tree)
@@ -108,6 +115,7 @@ class CSSParser:
 class TagSelector:
     def __init__(self, tag):
         self.tag = tag
+        self.priority = 1
 
     def matches(self, node):
         return isinstance(node, Element) and self.tag == node.tag
@@ -116,6 +124,8 @@ class DescendantSelector:
     def __init__(self, ancestor, descendant):
         self.ancestor = ancestor
         self.descendant = descendant
+        self.priority = ancestor.priority + descendant.priority
+
 
     def matches(self, node):
         if not self.descendant.matches(node): return False
@@ -126,6 +136,12 @@ class DescendantSelector:
     
 def style(node, rules):
     node.style = {}
+
+    for property, default_value in INHERITED_PROPERTIES.items():
+        if node.parent:
+            node.style[property] = node.parent.style[property]
+        else:
+            node.style[property] = default_value
 
     for selector, body in rules:
         if not selector.matches(node): continue
@@ -138,6 +154,19 @@ def style(node, rules):
             node.style[property] = value
         for child in node.children:
             style(child)
+
+    if node.style["font-size"].endswith("%"):
+        if node.parent:
+            parent_font_size = node.parent.style["font-size"]
+        else:
+            parent_font_size = INHERITED_PROPERTIES["font-size"]
+        node_pct = float(node.style["font-size"][:-1])
+        parent_px = float(parent_font_size[:2])
+        node.style["font-size"] = str(node_pct * parent_px) + "px"
+
+def cascade_priority(rule):
+    selector, body = rule
+    return selector.priority
     
 
 # chapter 6 end
@@ -151,7 +180,8 @@ class Browser:
         self.canvas = tkinter.Canvas(
             self.window,
             width=WIDTH,
-            height=HEIGHT
+            height=HEIGHT,
+            bg="white",
         )
         bar = tkinter.Scrollbar(self.window)
         bar.pack(side="right", fill= "y")
@@ -180,6 +210,7 @@ class Browser:
     def load(self, url):
         body = url.request()
         self.nodes = HTMLParser(body).parse()
+        rules = DEFAULT_STYLE_SHEET.copy()
 
         links = [node.attributes["href"]
                  for node in tree_to_list(self.nodes, [])
@@ -194,8 +225,7 @@ class Browser:
             except:
                 continue
             rules.extend(CSSParser(body).parse())
-        rules = DEFAULT_STYLE_SHEET.copy()
-        style(self.nodes, rules)
+        style(self.nodes, sorted(rules, key=cascade_priority))
         self.document = DocumentLayout(self.nodes)
         self.document.layout()
         self.display_list = []
@@ -204,5 +234,5 @@ class Browser:
 
 if __name__ == "__main__":
     import sys
-    Browser().load(url.URL(sys.argv[1]))
+    Browser().load(URL(sys.argv[1]))
     tkinter.mainloop()

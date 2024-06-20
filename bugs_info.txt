@@ -56,3 +56,17 @@ def layout(text):
             cursor_y += font.metrics("linespace")*1.25
             cursor_x = HSTEP
     return display_list
+
+
+
+            color = node.style["color"]
+        weight = node.style["font-weight"]
+        style = node.style["font-style"]
+        if style == "normal": style = "roman"
+        size = int(float(node.style["font-size"][:-2]) * .75)
+        font = get_font(size, weight, style)
+        w = font.measure(word)
+        if self.cursor_x + w >= self.width:
+            self.flush()
+        self.line.append((self.cursor_x, word, font, color))
+        self.cursor_x += w + font.measure(" ") 
