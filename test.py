@@ -1,6 +1,5 @@
 import tkinter
 import tkinter.font
-from htmparser import HTMLParser, Element, Text
 import socket
 import ssl
 
