@@ -2,6 +2,7 @@ import tkinter
 import tkinter.font
 from htmparser import Element, Text
 
+
 WIDTH, HEIGHT = 960, 720
 HSTEP, VSTEP = 13, 18
 SCROLL_STEP = 100
@@ -85,25 +86,32 @@ class BlockLayout:
             return "inline"
         else:
             return "block"
+        
+    def recurse(self, node):
+        if isinstance(node, Text):
+            for word in node.text.split():
+                self.word(node, word)
+        else:
+            self.open_tag(node.tag)
+            if node.tag == "br":
+                self.flush()
+            for child in node.children:
+                self.recurse(child)
+            self.close_tag(node.tag)
 
     def word(self, node, word):
-        if isinstance(node, Text):
-            style = getattr(node.parent, 'style', {})
-        else:
-            style = getattr(node, 'style', {})
+        weight = node.style["font-weight"]
+        style = node.style["font-style"]
+        if style == "normal": style = "roman"
+        size = int(float(node.style["font-size"][:-2]) * .75)
+        font = get_font(size, weight, style)
 
-        color = style.get("color", "black")
-        weight = style.get("font-weight", "normal")
-        font_style = style.get("font-style", "roman")
-        if font_style == "normal": font_style = "roman"
-        size = int(float(style.get("font-size", "16px")[:-2]) * .75)
-        
-        font = get_font(size, weight, font_style)
         w = font.measure(word)
         if self.cursor_x + w >= self.width:
             self.flush()
+        color = node.style["color"]
         self.line.append((self.cursor_x, word, font, color))
-        self.cursor_x += w + font.measure(" ")
+        self.cursor_x += w + font.measure(" ") 
 
     def flush(self):
         if not self.line: return
@@ -119,57 +127,46 @@ class BlockLayout:
         max_descent = max([metric["descent"] for metric in metrics])
         self.cursor_y = baseline + 1.25*max_descent
 
-    def recurse(self, node):
-        if isinstance(node, Text):
-            for word in node.text.split():
-                self.word(node, word)
-        else:
-            self.open_tag(node.tag)
-            if node.tag == "br":
-                self.flush()
-            for child in node.children:
-                self.recurse(child)
-            self.close_tag(node.tag)
 
+    def open_tag(self, tag): pass
+        # if tag == "i":
+        #     self.style = "italic"
+        # elif tag == "b":
+        #     self.weight = "bold"
+        # elif tag == "small":
+        #     self.size -= 2
+        # elif tag == "big":
+        #     self.size += 4
+        # elif tag == "br":
+        #     self.flush()    
 
-    def open_tag(self, tag):
-        if tag == "i":
-            self.style = "italic"
-        elif tag == "b":
-            self.weight = "bold"
-        elif tag == "small":
-            self.size -= 2
-        elif tag == "big":
-            self.size += 4
-        elif tag == "br":
-            self.flush()    
-
-    def close_tag(self, tag):
-        if tag == "i":
-            self.style = "roman"
-        elif tag == "b":
-            self.weight = "normal"
-        elif tag == "small":
-            self.size += 2
-        elif tag == "big":
-            self.size -= 4
-        elif tag == "p":
-            self.flush()
-            self.cursor_y += VSTEP
+    def close_tag(self, tag): pass
+        # if tag == "i":
+        #     self.style = "roman"
+        # elif tag == "b":
+        #     self.weight = "normal"
+        # elif tag == "small":
+        #     self.size += 2
+        # elif tag == "big":
+        #     self.size -= 4
+        # elif tag == "p":
+        #     self.flush()
+        #     self.cursor_y += VSTEP
         
     def paint(self):
         cmds = []
 
-        if isinstance(self.node, Element) and self.node.tag == "pre":
+        bgcolor = self.node.style.get("Background-color", "transparent")
+        if bgcolor != "transparent":
             x2, y2 = self.x + self.width, self.y + self.height
-            rect = DrawRect(self.x, self.y, x2, y2, "gray")
+            rect = DrawRect(self.x, self.y, x2, y2, bgcolor)
             cmds.append(rect)
 
-        # bgcolor = self.node.style.get("Background-color", "transparent")
-        # if bgcolor != "transparent":
+        # if isinstance(self.node, Element) and self.node.tag == "pre":
         #     x2, y2 = self.x + self.width, self.y + self.height
-        #     rect = DrawRect(self.x, self.y, x2, y2, bgcolor)
+        #     rect = DrawRect(self.x, self.y, x2, y2, "gray")
         #     cmds.append(rect)
+
 
         if self.layout_mode() == "inline":
             for x, y, word, font, color in self.display_list:

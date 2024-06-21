@@ -10,13 +10,6 @@ SCROLL_STEP = 100
 
 # chapter 6 start
 
-INHERITED_PROPERTIES = {
-    "font-size": "16px",
-    "font-style": "normal",
-    "font-weight": "normal",
-    "color": "black",
-}
-
 def tree_to_list(tree, list):
     list.append(tree)
     for child in tree.children:
@@ -48,6 +41,14 @@ class CSSParser:
             raise Exception("Parsing error")    
         return self.s[start:self.i]
     
+    def ignore_until(self, chars):
+        while self.i < len(self.s):
+            if self.s[self.i] in chars:
+                return self.s[self.i]
+            else:
+                self.i += 1
+        return None
+    
     def pair(self):
         prop = self.word()
         self.whitespace()
@@ -56,13 +57,15 @@ class CSSParser:
         val = self.word()
         return prop.casefold(), val
     
-    def ignore_until(self, chars):
-        while self.i < len(self.s):
-            if self.s[self.i] in chars:
-                return self.s[self.i]
-            else:
-                self.i += 1
-        return None
+    def selector(self):
+        out = TagSelector(self.word().casefold())
+        self.whilespace()
+        while self.i < len(self.s) and self.s[self.i] != "{":
+            tag = self.word()
+            descendant = TagSelector(tag.casefold())
+            out = DescendantSelector(out, descendant)
+            self.whitespace()
+        return out
     
     def body(self):
         pairs = {}
@@ -82,15 +85,6 @@ class CSSParser:
                     break
         return pairs
     
-    def selector(self):
-        out = TagSelector(self.word().casefold())
-        self.whilespace()
-        while self.i < len(self.s) and self.s[self.i] != "{":
-            tag = self.word()
-            descendant = TagSelector(tag.casefold())
-            out = DescendantSelector(out, descendant)
-            self.whitespace()
-        return out
     
     def parse(self):
         rules = []
@@ -134,6 +128,13 @@ class DescendantSelector:
             node = node.parent
         return False
     
+INHERITED_PROPERTIES = {
+    "font-size": "16px",
+    "font-style": "normal",
+    "font-weight": "normal",
+    "color": "black",
+}
+    
 def style(node, rules):
     node.style = {}
 
@@ -152,17 +153,18 @@ def style(node, rules):
         pairs = CSSParser(node.attributes["style"]).body()
         for property, value in pairs.items():
             node.style[property] = value
-        for child in node.children:
-            style(child)
 
     if node.style["font-size"].endswith("%"):
         if node.parent:
             parent_font_size = node.parent.style["font-size"]
         else:
             parent_font_size = INHERITED_PROPERTIES["font-size"]
-        node_pct = float(node.style["font-size"][:-1])
+        node_pct = float(node.style["font-size"][:-1])/100
         parent_px = float(parent_font_size[:2])
         node.style["font-size"] = str(node_pct * parent_px) + "px"
+        
+    for child in node.children:
+        style(child, rules)
 
 def cascade_priority(rule):
     selector, body = rule
@@ -171,7 +173,7 @@ def cascade_priority(rule):
 
 # chapter 6 end
 
-DEFAULT_STYLE_SHEET = CSSParser(open("browser.css").read()).parse()
+DEFAULT_STYLE_SHEET = CSSParser(open("/home/angkul/my_data/coding/browser/browser.css").read()).parse()
 
 class Browser:
     def __init__(self):
@@ -189,29 +191,13 @@ class Browser:
         self.scroll = 0
         self.window.bind("<Down>", self.scrolldown)
         self.window.bind("<Up>", self.scrollup)
+        self.display_list = []
         
-
-    def scrolldown(self, e):
-        max_y = max(self.document.height + 2*VSTEP - HEIGHT, 0)
-        self.scroll = min(self.scroll + SCROLL_STEP, max_y)
-        self.draw()
-
-    def scrollup(self, e):
-        self.scroll = max(self.scroll - SCROLL_STEP, 0)
-        self.draw()
-
-    def draw(self):
-        self.canvas.delete("all")
-        for cmd in self.display_list:
-            if cmd.top > self.scroll + HEIGHT: continue
-            if cmd.bottom < self.scroll: continue
-            cmd.execute(self.scroll, self.canvas)
-
     def load(self, url):
         body = url.request()
         self.nodes = HTMLParser(body).parse()
-        rules = DEFAULT_STYLE_SHEET.copy()
 
+        rules = DEFAULT_STYLE_SHEET.copy()
         links = [node.attributes["href"]
                  for node in tree_to_list(self.nodes, [])
                  if isinstance(node, Element)
@@ -231,6 +217,23 @@ class Browser:
         self.display_list = []
         paint_tree(self.document, self.display_list)
         self.draw()
+
+    def scrolldown(self, e):
+        max_y = max(self.document.height + 2*VSTEP - HEIGHT, 0)
+        self.scroll = min(self.scroll + SCROLL_STEP, max_y)
+        self.draw()
+
+    def scrollup(self, e):
+        self.scroll = max(self.scroll - SCROLL_STEP, 0)
+        self.draw()
+
+    def draw(self):
+        self.canvas.delete("all")
+        for cmd in self.display_list:
+            if cmd.top > self.scroll + HEIGHT: continue
+            if cmd.bottom < self.scroll: continue
+            cmd.execute(self.scroll, self.canvas)
+
 
 if __name__ == "__main__":
     import sys
