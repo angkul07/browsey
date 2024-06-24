@@ -92,12 +92,10 @@ class BlockLayout:
             for word in node.text.split():
                 self.word(node, word)
         else:
-            self.open_tag(node.tag)
             if node.tag == "br":
                 self.flush()
             for child in node.children:
                 self.recurse(child)
-            self.close_tag(node.tag)
 
     def word(self, node, word):
         weight = node.style["font-weight"]
@@ -109,7 +107,7 @@ class BlockLayout:
         w = font.measure(word)
         if self.cursor_x + w >= self.width:
             self.flush()
-        color = node.style["color"]
+        color = node.style.get("color", "black")
         self.line.append((self.cursor_x, word, font, color))
         self.cursor_x += w + font.measure(" ") 
 
@@ -129,29 +127,8 @@ class BlockLayout:
 
 
     def open_tag(self, tag): pass
-        # if tag == "i":
-        #     self.style = "italic"
-        # elif tag == "b":
-        #     self.weight = "bold"
-        # elif tag == "small":
-        #     self.size -= 2
-        # elif tag == "big":
-        #     self.size += 4
-        # elif tag == "br":
-        #     self.flush()    
 
     def close_tag(self, tag): pass
-        # if tag == "i":
-        #     self.style = "roman"
-        # elif tag == "b":
-        #     self.weight = "normal"
-        # elif tag == "small":
-        #     self.size += 2
-        # elif tag == "big":
-        #     self.size -= 4
-        # elif tag == "p":
-        #     self.flush()
-        #     self.cursor_y += VSTEP
         
     def paint(self):
         cmds = []
@@ -161,11 +138,6 @@ class BlockLayout:
             x2, y2 = self.x + self.width, self.y + self.height
             rect = DrawRect(self.x, self.y, x2, y2, bgcolor)
             cmds.append(rect)
-
-        # if isinstance(self.node, Element) and self.node.tag == "pre":
-        #     x2, y2 = self.x + self.width, self.y + self.height
-        #     rect = DrawRect(self.x, self.y, x2, y2, "gray")
-        #     cmds.append(rect)
 
 
         if self.layout_mode() == "inline":
