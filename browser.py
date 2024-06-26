@@ -1,4 +1,5 @@
-from url import URL
+from url import *
+import url
 import tkinter
 import tkinter.font
 from htmparser import *
@@ -7,8 +8,6 @@ from layouts import *
 WIDTH, HEIGHT = 960, 720
 HSTEP, VSTEP = 13, 18
 SCROLL_STEP = 100
-
-# chapter 6 start
 
 def tree_to_list(tree, list):
     list.append(tree)
@@ -38,17 +37,9 @@ class CSSParser:
             else:
                 break
         if not (self.i > start):
-            raise Exception("Parsing error")    
+            raise Exception("Parsing error")
         return self.s[start:self.i]
-    
-    def ignore_until(self, chars):
-        while self.i < len(self.s):
-            if self.s[self.i] in chars:
-                return self.s[self.i]
-            else:
-                self.i += 1
-        return None
-    
+
     def pair(self):
         prop = self.word()
         self.whitespace()
@@ -57,15 +48,13 @@ class CSSParser:
         val = self.word()
         return prop.casefold(), val
     
-    def selector(self):
-        out = TagSelector(self.word().casefold())
-        self.whilespace()
-        while self.i < len(self.s) and self.s[self.i] != "{":
-            tag = self.word()
-            descendant = TagSelector(tag.casefold())
-            out = DescendantSelector(out, descendant)
-            self.whitespace()
-        return out
+    def ignore_until(self, chars):
+        while self.i < len(self.s):
+            if self.s[self.i] in chars:
+                return self.s[self.i]
+            else:
+                self.i += 1
+        return None
     
     def body(self):
         pairs = {}
@@ -84,8 +73,17 @@ class CSSParser:
                 else:
                     break
         return pairs
-    
-    
+
+    def selector(self):
+        out = TagSelector(self.word().casefold())
+        self.whitespace()
+        while self.i < len(self.s) and self.s[self.i] != "{":
+            tag = self.word()
+            descendant = TagSelector(tag.casefold())
+            out = DescendantSelector(out, descendant)
+            self.whitespace()
+        return out
+
     def parse(self):
         rules = []
         while self.i < len(self.s):
@@ -119,8 +117,7 @@ class DescendantSelector:
         self.ancestor = ancestor
         self.descendant = descendant
         self.priority = ancestor.priority + descendant.priority
-
-
+            
     def matches(self, node):
         if not self.descendant.matches(node): return False
         while node.parent:
@@ -134,36 +131,25 @@ INHERITED_PROPERTIES = {
     "font-weight": "normal",
     "color": "black",
 }
-    
+
 def style(node, rules):
     node.style = {}
-    
-    # Apply default styles
-    if isinstance(node, Element):
-        if node.tag in ["h1", "h2", "h3", "h4", "h5", "h6"]:
-            size = {"h1": "32px", "h2": "24px", "h3": "18.72px", 
-                    "h4": "16px", "h5": "13.28px", "h6": "10.72px"}
-            node.style["font-size"] = size.get(node.tag, "16px")
-        elif node.tag == "a":
-            node.style["color"] = "blue"
-    
     for property, default_value in INHERITED_PROPERTIES.items():
         if node.parent:
-            node.style[property] = node.parent.style.get(property, default_value)
+            node.style[property] = node.parent.style[property]
         else:
             node.style[property] = default_value
-    
+
     for selector, body in rules:
-        if selector.matches(node):
-            for property, value in body.items():
-                node.style[property] = value
-    
+        if not selector.matches(node): continue
+        for property, value in body.items():
+            node.style[property] = value
+
     if isinstance(node, Element) and "style" in node.attributes:
         pairs = CSSParser(node.attributes["style"]).body()
         for property, value in pairs.items():
             node.style[property] = value
-    
-    # Handle percentage-based font sizes
+
     if node.style["font-size"].endswith("%"):
         if node.parent:
             parent_font_size = node.parent.style["font-size"]
@@ -172,19 +158,15 @@ def style(node, rules):
         node_pct = float(node.style["font-size"][:-1]) / 100
         parent_px = float(parent_font_size[:-2])
         node.style["font-size"] = str(node_pct * parent_px) + "px"
-    
+
     for child in node.children:
         style(child, rules)
-
 
 def cascade_priority(rule):
     selector, body = rule
     return selector.priority
-    
 
-# chapter 6 end
-
-DEFAULT_STYLE_SHEET = CSSParser(open("/home/angkul/my_data/coding/browser/browser.css").read()).parse()
+DEFAULT_STYLE_SHEET = CSSParser(open("browser.css").read()).parse()
 
 class Browser:
     def __init__(self):
@@ -244,6 +226,32 @@ class Browser:
             if cmd.top > self.scroll + HEIGHT: continue
             if cmd.bottom < self.scroll: continue
             cmd.execute(self.scroll, self.canvas)
+
+    def load(self, url):
+        body = url.request()
+        self.nodes = HTMLParser(body).parse()
+
+        rules = DEFAULT_STYLE_SHEET.copy()
+        links = [node.attributes["href"]
+                 for node in tree_to_list(self.nodes, [])
+                 if isinstance(node, Element)
+                 and node.tag == "link"
+                 and node.attributes.get("rel") == "stylesheet"
+                 and "href" in node.attributes]
+        for link in links:
+            style_url = url.resolve(link)
+            try:
+                body = style_url.request()
+            except:
+                continue
+            rules.extend(CSSParser(body).parse())
+        style(self.nodes, sorted(rules, key=cascade_priority))
+
+        self.document = DocumentLayout(self.nodes)
+        self.document.layout()
+        self.display_list = []
+        paint_tree(self.document, self.display_list)
+        self.draw()
 
 
 if __name__ == "__main__":

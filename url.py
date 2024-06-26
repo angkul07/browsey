@@ -55,7 +55,6 @@ class URL:
         s.close()
         return content
     
-
     def resolve(self, url):
         if "://" in url: return URL(url)
         if not url.startswith("/"):
@@ -65,11 +64,10 @@ class URL:
                 if "/" in dir:
                     dir, _ = dir.rsplit("/", 1)
             url = dir + "/" + url
-            
         if url.startswith("//"):
             return URL(self.scheme + ":" + url)
         else:
             return URL(self.scheme + "://" + self.host + \
-                        ":" + str(self.port) + url)
+                       ":" + str(self.port) + url)
     
     

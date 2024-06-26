@@ -1,7 +1,6 @@
 import tkinter
 import tkinter.font
-from htmparser import Element, Text
-
+from htmparser import *
 
 WIDTH, HEIGHT = 960, 720
 HSTEP, VSTEP = 13, 18
@@ -86,7 +85,35 @@ class BlockLayout:
             return "inline"
         else:
             return "block"
-        
+
+    def word(self, node, word):
+        weight = node.style["font-weight"]
+        style = node.style["font-style"]
+        if style == "normal": style = "roman"
+        size = int(float(node.style["font-size"][:-2]) * .75)
+        font = get_font(size, weight, style)
+
+        w = font.measure(word)
+        if self.cursor_x + w > self.width:
+            self.flush()
+        color = node.style["color"]
+        self.line.append((self.cursor_x, word, font, color))
+        self.cursor_x += w + font.measure(" ")
+
+    def flush(self):
+        if not self.line: return
+        metrics = [font.metrics() for x, word, font, color in self.line]
+        max_ascent = max([metric["ascent"] for metric in metrics])
+        baseline = self.cursor_y + 1.25 * max_ascent
+        for rel_x, word, font, color in self.line:
+            x = self.x + rel_x
+            y = self.y + baseline - font.metrics("ascent")
+            self.display_list.append((x, y, word, font, color))
+        self.cursor_x = self.x
+        self.line = []
+        max_descent = max([metric["descent"] for metric in metrics])
+        self.cursor_y = baseline + 1.25 * max_descent
+
     def recurse(self, node):
         if isinstance(node, Text):
             for word in node.text.split():
@@ -97,43 +124,36 @@ class BlockLayout:
             for child in node.children:
                 self.recurse(child)
 
-    def word(self, node, word):
-        weight = node.style["font-weight"]
-        style = node.style["font-style"]
-        if style == "normal": style = "roman"
-        size = int(float(node.style["font-size"][:-2]) * .75)
-        font = get_font(size, weight, style)
 
-        w = font.measure(word)
-        if self.cursor_x + w >= self.width:
+    def open_tag(self, tag):
+        if tag == "i":
+            self.style = "italic"
+        elif tag == "b":
+            self.weight = "bold"
+        elif tag == "small":
+            self.size -= 2
+        elif tag == "big":
+            self.size += 4
+        elif tag == "br":
+            self.flush()    
+
+    def close_tag(self, tag):
+        if tag == "i":
+            self.style = "roman"
+        elif tag == "b":
+            self.weight = "normal"
+        elif tag == "small":
+            self.size += 2
+        elif tag == "big":
+            self.size -= 4
+        elif tag == "p":
             self.flush()
-        color = node.style.get("color", "black")
-        self.line.append((self.cursor_x, word, font, color))
-        self.cursor_x += w + font.measure(" ") 
+            self.cursor_y += VSTEP
 
-    def flush(self):
-        if not self.line: return
-        metrics = [font.metrics() for x, word, font, color in self.line]
-        max_ascent = max([metric["ascent"] for metric in metrics])
-        baseline = self.cursor_y + 1.25*max_ascent
-        for rel_x, word, font, color in self.line:
-            x = self.x + rel_x
-            y = self.y + baseline - font.metrics("ascent")
-            self.display_list.append((x, y, word, font, color))
-        self.cursor_x = 0
-        self.line = []
-        max_descent = max([metric["descent"] for metric in metrics])
-        self.cursor_y = baseline + 1.25*max_descent
-
-
-    def open_tag(self, tag): pass
-
-    def close_tag(self, tag): pass
-        
     def paint(self):
         cmds = []
-
-        bgcolor = self.node.style.get("Background-color", "transparent")
+        bgcolor = self.node.style.get("background-color",
+                                      "transparent")
         if bgcolor != "transparent":
             x2, y2 = self.x + self.width, self.y + self.height
             rect = DrawRect(self.x, self.y, x2, y2, bgcolor)
@@ -167,21 +187,22 @@ class DocumentLayout:
     def paint(self):
         return []
 
-
 class DrawText:
     def __init__(self, x1, y1, text, font, color):
         self.top = y1
         self.left = x1
         self.text = text
         self.font = font
+        self.color = color
+
         self.bottom = y1 + font.metrics("linespace")
         self.color = color
 
     def execute(self, scroll, canvas):
         canvas.create_text(
             self.left, self.top - scroll,
-            text = self.text,
-            font = self.font,
+            text=self.text,
+            font=self.font,
             anchor='nw',
             fill=self.color)
 
