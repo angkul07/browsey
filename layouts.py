@@ -2,7 +2,7 @@ import tkinter
 import tkinter.font
 from htmparser import *
 from author_styles import *
-from browser import Rect
+from adding_tabs import Rect
 
 WIDTH, HEIGHT = 960, 720
 HSTEP, VSTEP = 13, 18
@@ -257,3 +257,5 @@ def paint_tree(layout_object, display_list):
 
     for child in layout_object.children:
         paint_tree(child, display_list)
+
+

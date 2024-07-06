@@ -4,6 +4,7 @@ import tkinter.font
 from htmparser import *
 from layouts import *
 from author_styles import *
+from adding_tabs import Chrome
     
 WIDTH, HEIGHT = 960, 720
 HSTEP, VSTEP = 13, 18
@@ -11,182 +12,7 @@ SCROLL_STEP = 100
 
 # start of chapter 7
 
-class Chrome:
-    def __init__(self, browser):
-        self.browser = browser
-        # enter url in address bar
-        self.focus = None
-        self.address_bar = ""
 
-        self.font = get_font(18, "normal", "roman")
-        self.font_height = self.font.metrics("linespace")
-
-        # detemine where the tab bar starts and ends
-        self.padding = 5
-        self.tabbar_top = 0
-        self.tabbar_bottom = self.font_height + 2*self.padding
-
-        # adding padding around the new-tab button
-        plus_width = self.font.measure("+") + 2*self.padding
-        self.newtab_rect = Rect(
-            self.padding, self.padding,
-            self.padding + plus_width,
-            self.padding + self.font_height
-        )
-        # self.bottom = self.tabbar_bottom
-
-        self.urlbar_top = self.tabbar_bottom
-        self.urlbar_bottom = self.urlbar_top + \
-            self.font_height + 2 * self.padding
-
-        # navigation history: address bar that shows the current URL
-        back_width = self.font.measure("<") + 2*self.padding
-        self.back_rect = Rect(
-            self.padding,
-            self.urlbar_top + self.padding,
-            self.padding + back_width,
-            self.urlbar_bottom - self.padding
-        )
-
-        self.address_rect = Rect(
-            self.back_rect.top + self.padding,
-            self.urlbar_top + self.padding,
-            WIDTH - self.padding,
-            self.urlbar_bottom - self.padding
-        )
-        
-        self.bottom = self.urlbar_bottom
-
-
-    def tab_rect(self, i):
-        tabs_start = self.newtab_rect.right + self.padding
-        tab_width = self.font.measure("Tab X") + 2*self.padding
-        return Rect(
-            tabs_start + tab_width * i, self.tabbar_top,
-            tabs_start + tab_width * (i+1), self.tabbar_bottom
-        )
-    
-    def paint(self):
-        cmds = []
-        # make sure that the browser chrome is always drawn on top of the page contents
-        cmds.append(DrawRect(
-            Rect(0, 0, WIDTH, self.bottom), "white"
-        ))
-        cmds.append(DrawLine(
-            0, self.bottom, WIDTH, self.bottom, "black", 1
-        ))
-
-        cmds.append(DrawOutline(self.newtab_rect, "black", 1))
-        cmds.append(DrawText(
-            self.newtab_rect.left + self.padding,
-            self.newtab_rect.top,
-            "+", self.font, "black"
-        ))
-
-        for i, tab in enumerate(self.browser.tabs):
-            bounds = self.tab_rect(i)
-            cmds.append(DrawLine(
-                bounds.right, 0, bounds.right, bounds.bottom,
-                "black", 1))
-            cmds.append(DrawLine(
-                bounds.left, 0, bounds.left, bounds.bottom,
-                "black", 1))
-            cmds.append(DrawText(
-                bounds.left + self.padding, bounds.top + self.padding,
-                "Tab {}".format(i), self.font, "black"))
-            
-            if tab == self.browser.active_tab:
-                cmds.append(DrawLine(
-                    0, bounds.bottom, bounds.left, bounds.bottom, "black", 1
-                ))
-                cmds.append(DrawLine(
-                    bounds.right, bounds.bottom, WIDTH, bounds.bottom, "black", 1
-                ))
-
-        # painting lhe back button
-        cmds.append(DrawOutline(self.back_rect, "black", 1))
-        cmds.append(DrawText(
-            self.back_rect.left + self.padding,
-            self.back_rect.top,
-            "<", self.font, "black"
-        ))
-
-        # address bar getting the current tab's URL from the browser
-        cmds.append(DrawOutline(self.address_rect, "black", 1))
-        if self.focus == "address bar":
-            cmds.append(DrawText(
-                self.address_rect.left + self.padding,
-                self.address_rect.top,
-                self.address_bar, self.font, "black"))
-            
-            # adding a cursor in the address bar
-            w = self.font.measure(self.address_bar)
-            cmds.append(DrawLine(self.address_rect.left + self.padding + w,
-                                self.address_rect.top,
-                                self.address_rect.left + self.padding + w,
-                                self.address_rect.bottom,
-                                "red", 1))
-        else:
-            url = str(self.browser.active_tab.url)
-            cmds.append(DrawText(
-                self.address_rect.left + self.padding,
-                self.address_rect.top,
-                url, self.font, "black"
-            ))
-
-        return cmds
-    
-    def click(self, x, y):
-        self.focus = None
-        if self.newtab_rect.containsPoint(x, y):
-            self.browser.new_tab(URL("https://google.com"))
-        elif self.back_rect.containsPoint(x, y):
-            self.browser.active_tab.go_back()
-        elif self.address_rect.containsPoint(x, y):
-            self.focus = "address bar"
-            self.address_bar = ""
-        else:
-            for i, tab in enumerate(self.browser.tabs):
-                if self.tab_rect(i).containsPoint(x, y):
-                    self.browser.active_tab = tab
-                    break
-
-    def keypress(self, char):
-        if self.focus == "address bar":
-            self.address_bar += char
-
-    def enter(self):
-        if self.focus == "address bar":
-            self.browser.active_tab.load(URL(self.address_bar))
-            self.focus = None
-
-# DrawOutline class draws a rectangular border
-class DrawOutline:
-    def __init__(self, rect, color, thickness):
-        self.rect = rect
-        self.color = color
-        self.thickness = thickness
-
-    def execute(self, scroll, canvas):
-        canvas.create_rectangle(
-            self.rect.left, self.rect.top - scroll,
-            self.rect.right, self.rect.bottom - scroll,
-            width = self.thickness,
-            outline = self.color
-        )
-
-class DrawLine:
-    def __init__(self, x1, y1, x2, y2, color, thickness):
-        self.rect = Rect(x1, y1, x2, y2)
-        self.color = color
-        self.thickness = thickness
-
-    def execute(self, scroll, canvas):
-        canvas.create_line(
-            self.rect.left, self.rect.top - scroll,
-            self.rect.right, self.rect.bottom - scroll,
-            fill = self.color, width=self.thickness
-        )
 
 # end of chapter 7
 
@@ -262,17 +88,6 @@ class Tab:
             back = self.history.pop()
             self.load(back)
 
-# Store rectangles representing the size of various elements in browser chrome
-class Rect:
-    def __init__(self, left, top, right, bottom):
-        self.left = left
-        self.top = top
-        self.right = right
-        self.bottom = bottom
-
-    def containsPoint(self, x, y):
-        return x >= self.left and x < self.right \
-        and y >= self.top and y < self.bottom
 
 class Browser:
     def __init__(self):
