@@ -2,6 +2,7 @@ import tkinter
 import tkinter.font
 from htmparser import *
 from author_styles import *
+from browser import Rect
 
 WIDTH, HEIGHT = 960, 720
 HSTEP, VSTEP = 13, 18
@@ -32,6 +33,10 @@ class LineLayout:
         self.parent = parent
         self.previous = previous
         self.children = []
+        self.x = None
+        self.y = None
+        self.width = None
+        self.height = None
 
     # laying out line and text objects after building them in BlockLayout().word()
     def layout(self):
@@ -46,6 +51,10 @@ class LineLayout:
         # laying out each word
         for word in self.children:
             word.layout()
+
+        if not self.children:
+            self.height = 0
+            return
 
         # computing baseline for y position
         max_ascent = max([word.font.metrics("ascent") for word in self.children])
@@ -67,6 +76,11 @@ class TextLayout:
         self.children = []
         self.parent = parent
         self.previous = previous
+        self.x = None
+        self.y = None
+        self.width = None
+        self.height = None
+        self.font = None
 
     # laying out text objects after building them in BlockLayout().word()
     def layout(self):
@@ -182,11 +196,13 @@ class BlockLayout:
         bgcolor = self.node.style.get("background-color",
                                       "transparent")
         if bgcolor != "transparent":
-            x2, y2 = self.x + self.width, self.y + self.height
-            rect = DrawRect(self.x, self.y, x2, y2, bgcolor)
+            rect = DrawRect(self.self_rect(), bgcolor)
             cmds.append(rect)
 
         return cmds
+    
+    def self_rect(self):
+        return Rect(self.x, self.y, self.x + self.width, self.y + self.height)
 
 class DocumentLayout:
     def __init__(self, node):
@@ -210,38 +226,31 @@ class DocumentLayout:
 
 class DrawText:
     def __init__(self, x1, y1, text, font, color):
-        self.top = y1
-        self.left = x1
+        self.rect = Rect(x1, y1,
+            x1 + font.measure(text), y1 + font.metrics("linespace"))
         self.text = text
         self.font = font
         self.color = color
 
-        self.bottom = y1 + font.metrics("linespace")
-        self.color = color
-
     def execute(self, scroll, canvas):
         canvas.create_text(
-            self.left, self.top - scroll,
+            self.rect.left, self.rect.top - scroll,
             text=self.text,
             font=self.font,
             anchor='nw',
             fill=self.color)
 
 class DrawRect:
-    def __init__(self, x1, y1, x2, y2, color):
-        self.top = y1
-        self.left = x1
-        self.bottom = y2
-        self.right = x2
-        self.color = color 
+    def __init__(self, rect, color):
+        self.rect = rect
+        self.color = color
 
     def execute(self, scroll, canvas):
         canvas.create_rectangle(
-            self.left, self.top - scroll,
-            self.right, self.bottom - scroll,
+            self.rect.left, self.rect.top - scroll,
+            self.rect.right, self.rect.bottom - scroll,
             width=0,
-            fill=self.color
-        )
+            fill=self.color)
 
 def paint_tree(layout_object, display_list):
     display_list.extend(layout_object.paint())

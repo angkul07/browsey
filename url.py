@@ -20,6 +20,15 @@ class URL:
             self.host, port = self.host.split(":", 1)
             self.port = int(port)
 
+    # converting URL objects to strings
+    def __str__(self):
+        port_part = ":" + str(self.port)
+        if self.scheme == "https" and self.port == 443:
+            port_part = " "
+        if self.scheme == "http" and self.port == 80:
+            port_part = ""
+        return self.scheme + "://" + self.host + port_part + self.path
+
     def request(self):
         s = socket.socket(
             family=socket.AF_INET,
