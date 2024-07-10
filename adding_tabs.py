@@ -1,4 +1,5 @@
 from url import *
+import tkinter
 import tkinter.font
 from htmparser import *
 import layouts
@@ -162,6 +163,10 @@ class Chrome:
     def keypress(self, char):
         if self.focus == "address bar":
             self.address_bar += char
+
+    def do_backspace(self, char):
+        if self.focus == "address bar":
+            self.address_bar = self.address_bar[0:(len(self.address_bar)-1)]
 
     def enter(self):
         if self.focus == "address bar":

@@ -34,6 +34,7 @@ class Browser:
         self.window.bind("<Button-1>", self.handle_click)
         self.window.bind("<Key>", self.handle_key)
         self.window.bind("<Return>", self.handle_enter)
+        self.window.bind("<BackSpace>", self.backspace)
 
         self.tabs = []
         self.active_tab = None
@@ -63,6 +64,10 @@ class Browser:
 
     def handle_enter(self, e):
         self.chrome.enter()
+        self.draw()
+
+    def backspace(self, e):
+        self.chrome.do_backspace(e.char)
         self.draw()
 
     def new_tab(self, url):
