@@ -10,7 +10,7 @@ class URL:
             url = url + "/"
         self.host, url = url.split("/", 1)
         self.path = "/" + url
-# When parsing a URL, you often need to determine which port to use for network communication. 
+        # When parsing a URL, you often need to determine which port to use for network communication. 
         if self.scheme == "http":
             self.port = 80
         elif self.scheme == "https":
@@ -20,14 +20,6 @@ class URL:
             self.host, port = self.host.split(":", 1)
             self.port = int(port)
 
-    # converting URL objects to strings
-    def __str__(self):
-        port_part = ":" + str(self.port)
-        if self.scheme == "https" and self.port == 443:
-            port_part = " "
-        if self.scheme == "http" and self.port == 80:
-            port_part = ""
-        return self.scheme + "://" + self.host + port_part + self.path
 
     def request(self, payload=None):
         s = socket.socket(
@@ -35,7 +27,6 @@ class URL:
             type=socket.SOCK_STREAM,
             proto=socket.IPPROTO_TCP,
         )
-
         s.connect((self.host, self.port))   #tells the socket to connect to other computer
 
         if self.scheme == "https":
@@ -44,8 +35,7 @@ class URL:
 
         # Request and response 
         method = "POST" if payload else "GET"
-        request = "GET {} HTTP/1.0\r\n".format(method, self.path)
-        
+        request = "{} {} HTTP/1.0\r\n".format(method, self.path)
         if payload:
             length = len(payload.encode("utf8"))
             request += "Content-Length: {}\r\n".format(length)
@@ -89,4 +79,11 @@ class URL:
             return URL(self.scheme + "://" + self.host + \
                        ":" + str(self.port) + url)
     
-    
+    # converting URL objects to strings
+    def __str__(self):
+        port_part = ":" + str(self.port)
+        if self.scheme == "https" and self.port == 443:
+            port_part = " "
+        if self.scheme == "http" and self.port == 80:
+            port_part = ""
+        return self.scheme + "://" + self.host + port_part + self.path

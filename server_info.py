@@ -2,7 +2,7 @@ from url import *
 import tkinter
 import tkinter.font
 from htmparser import *
-from layouts import *
+from layouts import get_font, INPUT_WIDTH_PX, Rect, DrawRect, DrawText
 from author_styles import *
 from adding_tabs import DrawLine
 
