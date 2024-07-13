@@ -3,10 +3,12 @@ import tkinter.font
 from htmparser import *
 from author_styles import *
 from adding_tabs import Rect
+from server_info import InputLayout
 
 WIDTH, HEIGHT = 960, 720
 HSTEP, VSTEP = 13, 18
 SCROLL_STEP = 100
+INPUT_WIDTH_PX = 200
 
 FONTS = {}
 
@@ -66,6 +68,9 @@ class LineLayout:
 
         self.height = 1.25 * (max_ascent + max_descent)
 
+    def should_paint(self):
+        return True
+
     def paint(self):
         return []   
 
@@ -99,6 +104,9 @@ class TextLayout:
             self.x = self.parent.x
 
         self.height = self.font.metrics("linespace")
+
+    def should_paint(self):
+        return True
 
     def paint(self):
         color = self.node.style["color"]
@@ -152,7 +160,7 @@ class BlockLayout:
                   child.tag in BLOCK_ELEMENTS
                   for child in self.node.children]):
             return "block"
-        elif self.node.children:
+        elif self.node.children or self.node.tag == "input":
             return "inline"
         else:
             return "block"
@@ -188,8 +196,36 @@ class BlockLayout:
         else:
             if node.tag == "br":
                 self.new_line()
-            for child in node.children:
-                self.recurse(child)
+            elif node.tag == "input" or node.tag == "button":
+                self.input(node)
+            else:
+                for child in node.children:
+                    self.recurse(child)
+    
+    def self_rect(self):
+        return Rect(self.x, self.y, self.x + self.width, self.y + self.height)
+    
+    def input(self, node):
+        w = INPUT_WIDTH_PX
+        if self.cursor_x + w > self.width:
+            self.new_line()
+        line = self.children[-1]
+        previous_word = line.children[-1] if line.children else None
+        input = InputLayout(node, previous_word)
+        line.children.append(input)
+
+        weight = node.style["font-weight"]
+        style = node.style["font-style"]
+        if style == "normal": style = "roman"
+        size = int(float(node.style["font-size"][:-2]*.75))
+        font = get_font(size, weight, style)
+
+        self.cursor_x += w + font.measure(" ")
+
+    def should_paint(self):
+        return isinstance(self.node, Text) or \
+            (self.node.tag != "input" and self.node.tag != "button")
+    
 
     def paint(self):
         cmds = []
@@ -200,9 +236,6 @@ class BlockLayout:
             cmds.append(rect)
 
         return cmds
-    
-    def self_rect(self):
-        return Rect(self.x, self.y, self.x + self.width, self.y + self.height)
 
 class DocumentLayout:
     def __init__(self, node):
@@ -220,6 +253,9 @@ class DocumentLayout:
         self.y = VSTEP
         child.layout()
         self.height = child.height
+
+    def should_paint(self):
+        return True
 
     def paint(self):
         return []
@@ -253,7 +289,8 @@ class DrawRect:
             fill=self.color)
 
 def paint_tree(layout_object, display_list):
-    display_list.extend(layout_object.paint())
+    if layout_object.should_paint():
+        display_list.extend(layout_object.paint())
 
     for child in layout_object.children:
         paint_tree(child, display_list)

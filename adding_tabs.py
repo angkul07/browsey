@@ -4,6 +4,7 @@ import tkinter.font
 from htmparser import *
 import layouts
 from author_styles import *
+import urllib.parse
 
 WIDTH, HEIGHT = 960, 720
 HSTEP, VSTEP = 13, 18
@@ -65,7 +66,6 @@ class Chrome:
         )
         
         self.bottom = self.urlbar_bottom
-
 
     def tab_rect(self, i):
         tabs_start = self.newtab_rect.right + self.padding
@@ -163,6 +163,11 @@ class Chrome:
     def keypress(self, char):
         if self.focus == "address bar":
             self.address_bar += char
+            return True
+        return False
+    
+    def blur(self):
+        self.focus = None
 
     def do_backspace(self, char):
         if self.focus == "address bar":
@@ -221,16 +226,17 @@ class Tab:
         self.url = None
         self.history = []
         self.tab_height = tab_height
+        self.focus = None
 
         
-    def load(self, url):
-        body = url.request()
+    def load(self, url, payload=None):
         self.scroll = 0
         self.url = url
         self.history.append(url)
+        body = url.request(payload)
         self.nodes = HTMLParser(body).parse()
 
-        rules = DEFAULT_STYLE_SHEET.copy()
+        self.rules = DEFAULT_STYLE_SHEET.copy()
         links = [node.attributes["href"]
                  for node in tree_to_list(self.nodes, [])
                  if isinstance(node, Element)
@@ -242,13 +248,21 @@ class Tab:
                 body = url.resolve(link).request()
             except:
                 continue
-            rules.extend(CSSParser(body).parse())
-        style(self.nodes, sorted(rules, key=cascade_priority))
+            self.rules.extend(CSSParser(body).parse())
 
+        self.render()
+    
+    def render(self):
+        style(self.nodes, sorted(self.rules, key=cascade_priority))
         self.document = layouts.DocumentLayout(self.nodes)
         self.document.layout()
         self.display_list = []
         layouts.paint_tree(self.document, self.display_list)
+
+    def keypress(self, char):
+        if self.focus:
+            self.focus.attributes["value"] += char
+            self.render()
 
     def draw(self, canvas, offset):
         for cmd in self.display_list:
@@ -264,10 +278,11 @@ class Tab:
         self.scroll = max(self.scroll - SCROLL_STEP, 0)
 
     def click(self, x, y):
+        self.focus = None
         y += self.scroll
         objs = [obj for obj in tree_to_list(self.document, [])
-        if obj.x <= x < obj.x + obj.width
-        and obj.y <= y < obj.y + obj.height]
+                if obj.x <= x < obj.x + obj.width
+                and obj.y <= y < obj.y + obj.height]
         if not objs: 
             return
         elt = objs[-1].node
@@ -278,7 +293,38 @@ class Tab:
             elif elt.tag == "a" and "href" in elt.attributes:
                 url = self.url.resolve(elt.attributes["href"])
                 return self.load(url)
+            elif elt.tag == "input":
+                elt.attributes["values"] = ""
+                if self.focus:
+                    self.focus.is_focused = False
+                self.focus = elt
+                elt.is_focused = True
+                return self.render()
+            elif elt.tag == "button":
+                while elt:
+                    if elt.tag == "form" and "action" in elt.attributes:
+                        return self.submit_form(elt)
+                    elt = elt.parent
             elt = elt.parent
+
+    def submit_form(self, elt):
+        inputs = [node for node in tree_to_list(elt, [])
+                  if isinstance(node, Element)
+                  and node.tag == "input"
+                  and "name" in node.attributes]
+        
+        body = ""
+        for input in inputs:
+            name = input.attributes["name"]
+            value = input.attributes.get("value", "")
+            name = urllib.parse.quote(name)
+            value = urllib.parse.quote(value)
+            body += "&" + name + "=" + value
+        body = body[1:]
+
+        # making a POST request
+        url = self.url.resolve(elt.attributes["action"])
+        self.load(url, body)
 
     def go_back(self):
         if len(self.history) > 1:

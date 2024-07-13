@@ -9,12 +9,12 @@ from adding_tabs import Chrome, Tab
 WIDTH, HEIGHT = 960, 720
 HSTEP, VSTEP = 13, 18
 SCROLL_STEP = 100
+INPUT_WIDTH_PX = 200
 
-# start of chapter 7
+# start of chapter 8
 
 
-
-# end of chapter 7
+# end of chapter 8
 
 class Browser:
     def __init__(self):
@@ -38,6 +38,7 @@ class Browser:
 
         self.tabs = []
         self.active_tab = None
+        self.focus = None
         self.chrome = Chrome(self)
 
     def handle_down(self, e):
@@ -50,8 +51,11 @@ class Browser:
 
     def handle_click(self, e):
         if e.y < self.chrome.bottom:
+            self.focus = None
             self.chrome.click(e.x, e.y)
         else:
+            self.focus = "content"
+            self.chrome.blur()
             tab_y = e.y - self.chrome.bottom
             self.active_tab.click(e.x, tab_y)
         self.draw()
@@ -59,8 +63,11 @@ class Browser:
     def handle_key(self, e):
         if len(e.char) == 0: return
         if not (0x20 <= ord(e.char) < 0x7f): return
-        self.chrome.keypress(e.char)
-        self.draw()
+        if self.chrome.keypress(e.char):
+            self.draw()
+        elif self.focus == "content":
+            self.active_tab.keypress(e.char)
+            self.draw()
 
     def handle_enter(self, e):
         self.chrome.enter()

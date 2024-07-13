@@ -109,6 +109,8 @@ class Text:
         self.text = text
         self.children = []
         self.parent = parent
+        self.style = {}
+        self.is_focused = False
 
     def __repr__(self):
         return repr(self.text)
@@ -119,6 +121,8 @@ class Element:
         self.attributes = attributes
         self.children = []
         self.parent = parent
+        self.style = {}
+        self.is_focused = None
 
     def __repr__(self) -> str:
         return "<" + self.tag + ">"
