@@ -277,16 +277,15 @@ class Tab:
     def scrollup(self):
         self.scroll = max(self.scroll - SCROLL_STEP, 0)
 
+
     def click(self, x, y):
         self.focus = None
         y += self.scroll
         objs = [obj for obj in tree_to_list(self.document, [])
                 if obj.x <= x < obj.x + obj.width
                 and obj.y <= y < obj.y + obj.height]
-        if not objs: 
-            return
+        if not objs: return
         elt = objs[-1].node
-
         while elt:
             if isinstance(elt, Text):
                 pass
@@ -294,7 +293,7 @@ class Tab:
                 url = self.url.resolve(elt.attributes["href"])
                 return self.load(url)
             elif elt.tag == "input":
-                elt.attributes["values"] = ""
+                elt.attributes["value"] = ""
                 if self.focus:
                     self.focus.is_focused = False
                 self.focus = elt

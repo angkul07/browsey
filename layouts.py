@@ -3,7 +3,7 @@ import tkinter.font
 from htmparser import *
 from author_styles import *
 from adding_tabs import Rect
-from server_info import InputLayout
+import server_info
 
 WIDTH, HEIGHT = 960, 720
 HSTEP, VSTEP = 13, 18
@@ -211,7 +211,7 @@ class BlockLayout:
             self.new_line()
         line = self.children[-1]
         previous_word = line.children[-1] if line.children else None
-        input = InputLayout(node, line, previous_word)
+        input = server_info.InputLayout(node, line, previous_word)
         line.children.append(input)
 
         weight = node.style["font-weight"]

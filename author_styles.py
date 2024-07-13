@@ -1,4 +1,4 @@
-from layouts import Element
+from htmparser import Element
 
 def tree_to_list(tree, list):
     list.append(tree)

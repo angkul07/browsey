@@ -2,9 +2,23 @@ from url import *
 import tkinter
 import tkinter.font
 from htmparser import *
-from layouts import get_font, INPUT_WIDTH_PX, Rect, DrawRect, DrawText
+import layouts
 from author_styles import *
 from adding_tabs import DrawLine
+
+WIDTH, HEIGHT = 960, 720
+HSTEP, VSTEP = 13, 18
+SCROLL_STEP = 100
+INPUT_WIDTH_PX = 200
+FONTS = {}
+
+def get_font(size, weight, slant):
+    key = (size, weight, slant)
+    if key not in FONTS:
+        font = tkinter.font.Font(size = size, weight = weight, slant = slant)
+        label = tkinter.Label(font = font)
+        FONTS[key] = (font, label)
+    return FONTS[key][0]
 
 class InputLayout:
     def __init__(self, node, parent, previous):
@@ -40,28 +54,28 @@ class InputLayout:
         return True
     
     def self_rect(self):
-        return Rect(self.x, self.y, self.x+self.width, self.y+self.height)
+        return layouts.Rect(self.x, self.y, self.x+self.width, self.y+self.height)
 
     def paint(self):
         cmds = []
         bgcolor = self.node.style.get("background-color", "transparent")
 
         if bgcolor != "transparent":
-            rect = DrawRect(self.self_rect(), bgcolor)
+            rect = layouts.DrawRect(self.self_rect(), bgcolor)
             cmds.append(rect)
 
         if self.node.tag == "input":
             text = self.node.attributes.get("value", "")
         elif self.node.tag == "button":
-            if len(self.node.tag) == 1 and \
+            if len(self.node.children) == 1 and \
                 isinstance(self.node.children[0], Text):
-                text = self.node.childer[0].text
+                text = self.node.children[0].text
         else:
             print("Ignoring HTML contents inside button")
             text = ""
 
         color = self.node.style["color"]
-        cmds.append(DrawText(self.x, self.y, text, self.font, color))
+        cmds.append(layouts.DrawText(self.x, self.y, text, self.font, color))
 
         if self.node.is_focused:
             cx = self.x + self.font.measure(text)
