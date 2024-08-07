@@ -5,6 +5,7 @@ from htmparser import *
 import layouts
 from author_styles import *
 import urllib.parse
+import dukpy
 
 WIDTH, HEIGHT = 960, 720
 HSTEP, VSTEP = 13, 18
@@ -20,6 +21,45 @@ def get_font(size, weight, slant):
         label = tkinter.Label(font = font)
         FONTS[key] = (font, label)
     return FONTS[key][0]
+
+RUNTIME_JS = open("runtime.js").read()
+
+class JSContext:
+    def __init__(self, tab):
+        self.tab = tab
+        self.interp = dukpy.JSInterpreter()
+        self.interp.export_function("log", print)
+        self.interp.export_function("querySelectorAll", self.querySelectorAll)
+        self.node_to_handle = {}
+        self.handle_to_node = {}
+
+    def run(self, script, code):
+        try:
+            return self.interp.evaljs(code)
+        except dukpy.JSRuntimeError as e:
+            print("Script", script, "crashed", e)
+
+    def querySelectorAll(self, selector_text):
+        selector = CSSParser(selector_text).selector()
+        nodes = [node for node
+                 in tree_to_list(self.tab.nodes, [])
+                 if selector.matches(node)]
+        return [self.get_handle(node) for node in nodes]
+    
+    def get_handle(self, elt):
+        if elt not in self.node_to_handle:
+            handle = len(self.node_to_handle)
+            self.node_to_handle[elt] = handle
+            self.handle_to_node[handle] = elt
+        else:
+            handle = self.node_to_handle[elt]
+        return handle
+    
+    def getAttribute(self, handle, attr):
+        elt = self.handle_to_node[handle]
+        attr = elt.attributes.get(attr, None)
+        return attr if attr else ""
+    
 
 class Chrome:
     def __init__(self, browser):
@@ -235,6 +275,24 @@ class Tab:
         self.history.append(url)
         body = url.request(payload)
         self.nodes = HTMLParser(body).parse()
+
+
+        # Downloading the <script> in a web page
+        scripts = [node.attributes["src"] for node
+                   in tree_to_list(self.nodes, [])
+                   if isinstance(node, Element)
+                   and node.tag == "script"
+                   and "src" in node.attributes]
+        
+        self.js = JSContext()
+        for script in scripts:
+            script_url = url.resolv(script)
+            try:
+                body = script_url.request()
+            except:
+                continue
+            self.js.run(body)
+            print("Script returned: ", dukpy.evaljs(body))
 
         self.rules = DEFAULT_STYLE_SHEET.copy()
         links = [node.attributes["href"]
